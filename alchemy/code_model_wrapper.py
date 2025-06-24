@@ -64,7 +64,7 @@ class CodeModelWrapper(object):
 
 
         # 提取代码块中的内容
-        code_match = re.search(r"```(:?python|py)?([\s\S]*?)```", output_text)
+        code_match = re.search(r"```(?:python|py)?([\s\S]*?)```", output_text)
         code = code_match.group(1).strip() if code_match else None
 
         return code
@@ -81,9 +81,4 @@ class CodeModelWrapper(object):
         """
         code = self.generate_code(question)
 
-        try:
-            result = self.sandbox.run(code)
-        except Exception as e:
-            result = ""
-
-        return result
+        return self.sandbox.run(code)

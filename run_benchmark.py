@@ -1,16 +1,22 @@
 import re
 import datasets
 import argparse
+import sys
+import os.path
 
-from alchemy import causal_model_wrapper
+from alchemy.causal_model_wrapper import CausalModelWrapper
+from alchemy.code_model_wrapper import CodeModelWrapper
+from alchemy.tools.sandboxes import LocalSandbox
 
 
-GSM8_model_prompts = {
+GSM8_causal_prompts = {
     "qwen2.5": """
 请回答下面数学问题，中间可以有思考和计算，计算结果单列一行，以“answer: "开头，不要包含单位。
 
 ## 示例
+user
 There were 7 birds on the tree, and then 2 flew away. How many birds are on the tree now?
+assistant
 7 - 2 = 5, so there are 5 birds left.
 answer: 5
 
@@ -21,20 +27,24 @@ answer: 5
 
 
 GSM8_code_prompts = {
-    "qwen2.5": '''
-下面你会看到一个问题，请写一段python代码计算答案，最终用print函数把答案打印出来。
+    "qwen2.5": """下面你会看到一个问题，请写一段python代码计算答案，最终显式调用print函数把答案打印出来。
 python代码按markdown格式输出。
 
 ## 示例
+user
 There were 7 birds on the tree, and then 2 flew away. How many birds are on the tree now?
+assistant
 7 - 2 = 5, so there are 5 birds left.
 ```python
-print(7 - 2)
+total = 7
+left = 2
+print(total - left)
 ```
 
 ## 限制
 - 输出的python代码按markdown格式，以```python开始，以```结束
-- 代码计算出最终结果需要print打印'''
+- 代码计算出最终结果需要显式调用print打印
+- 代码**不能没有print函数**""",
 }
 
 
@@ -47,7 +57,7 @@ class GSM8KBench:
     def extract_value(self, text: str) -> float | None:
         """
         从模型输出中用正则表达式提取答案。
-        答案格式为：最后一行 & #### {answer}
+        答案格式为：最后一行含有数字{answer}
         :param text: 模型生成的文本
         :return: 提取的答案，如果没有找到则返回空字符串
         """
@@ -61,7 +71,7 @@ class GSM8KBench:
         """
         遍历 GSM8k 测试集，对比 model 的返回结果和标准答案，计算准确率。
 
-        :param model: 具有 get_answers(question) -> list[str] 方法的模型对象
+        :param model: 具有 get_answers(question) -> str 方法的模型对象
         :return: 准确率 (float)
         """
         test_dataset = datasets.load_dataset("openai/gsm8k", "main")["test"]
@@ -72,9 +82,14 @@ class GSM8KBench:
             question = item["question"]
             std_answer = item["answer"]
             std_num = self.extract_value(std_answer)
-            model_answers = model.get_answers(question)  # 假设返回 str
-            print(model_answers, flush=True)
-            num = self.extract_value(model_answers)
+            try:
+                model_answer = model.get_answers(question)  # 假设返回 str
+                if not model_answer:
+                    num = "NoAnswer"
+                else:
+                    num = self.extract_value(model_answer)
+            except Exception as e:
+                num = type(e).__name__
             print(std_num, num, flush=True)
 
             # 假设每个问题只有一个正确答案
@@ -87,10 +102,13 @@ class GSM8KBench:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--model_path", type=str, required=True)
-    parser.add_argument("-m", "model_name", type=str, required=True)
+    parser.add_argument("-m", "--model_name", type=str, required=True)
     args = parser.parse_args()
     bench = GSM8KBench()
     model_name = args.model_name
-    model_path = args.model_path + local_models[model_name]
-    rate = bench.evaluate(causal_model_wrapper.CausalModelWrapper.from_pretrained(model_path, GSM8_model_prompts.get(model_name)))
-    print(f"Accuracy: {rate:.2%}")
+    if model_name not in local_models:
+        print(f"Model {model_name} not supported.", file=sys.stderr)
+        sys.exit(1)
+    model_path = os.path.join(args.model_path, local_models[model_name])
+    rate = bench.evaluate(CodeModelWrapper.from_pretrained(model_path, GSM8_code_prompts.get(model_name), LocalSandbox()))
+    print(f"model={model_name}, accuracy: {rate:.2%}")
