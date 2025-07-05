@@ -1,8 +1,17 @@
 import re
+
+from sympy import resultant
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 from typing import Optional, Tuple
+import logging
 
 from alchemy.tools.sandboxes import LocalSandbox
+
+
+# 配置日志记录
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
+                    filename="code_wrapper.log")
+
 
 class CodeModelWrapper(object):
     def __init__(self, model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, sys_prompt: str, sandbox: LocalSandbox):
@@ -23,7 +32,7 @@ class CodeModelWrapper(object):
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         return cls(model, tokenizer, sys_prompt, sandbox)
 
-    def generate_code(self, question: str) -> Optional[str]:
+    def _generate_code(self, question: str) -> (str, Optional[str]):
         """
         生成包含代码的 Markdown 输出，并从中提取出纯代码字符串。
 
@@ -67,18 +76,26 @@ class CodeModelWrapper(object):
         code_match = re.search(r"```(?:python|py)?([\s\S]*?)```", output_text)
         code = code_match.group(1).strip() if code_match else None
 
-        return code
+        return output_text, code
 
-    def get_answers(self, question: str) -> str:
+    def get_answers(self, question_id, question: str) -> str:
         """
         生成代码、提取代码并执行它，返回执行结果。
 
         Args:
+            question_id：用户问题id，便于调试
             question (str): 用户问题或指令。
 
         Returns:
             Tuple[str, str]: 原始生成的回答 + 代码执行结果
         """
-        code = self.generate_code(question)
 
-        return self.sandbox.run(code)
+        # 记录各项信息
+        logging.info(f"ID: {question_id}")
+        logging.info(f"Question:\n{question}")
+        output_text, code = self._generate_code(question)
+        logging.info(f"Output-Text:\n{output_text}")
+        logging.info(f"Code:\n{code}")
+        result = self.sandbox.run(code)
+        logging.info(f"Sandbox-Result:\n{result}")
+        return result

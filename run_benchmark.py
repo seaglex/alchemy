@@ -74,16 +74,17 @@ class GSM8KBench:
         :param model: 具有 get_answers(question) -> str 方法的模型对象
         :return: 准确率 (float)
         """
-        test_dataset = datasets.load_dataset("openai/gsm8k", "main")["test"]
+        test_id = "openai/gsm8k"
+        test_dataset = datasets.load_dataset(test_id, "main")["test"]
         correct_count = 0
         total_count = len(test_dataset)
 
-        for item in test_dataset:
+        for n, item in enumerate(test_dataset):
             question = item["question"]
             std_answer = item["answer"]
             std_num = self.extract_value(std_answer)
             try:
-                model_answer = model.get_answers(question)  # 假设返回 str
+                model_answer = model.get_answers(f"{test_id}-{n}", question)  # 假设返回 str
                 if not model_answer:
                     num = "NoAnswer"
                 else:

@@ -29,7 +29,7 @@ class CausalModelWrapper(object):
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         return cls(model, tokenizer, sys_prompt)
 
-    def get_answers(self, question) -> str:
+    def get_answers(self, question_id, question: str) -> str:
         # 将问题和上下文组合为完整的输入文本
         messages = [
             {"role": "system", "content": self.sys_prompt},
