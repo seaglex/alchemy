@@ -2,7 +2,7 @@ import unittest
 
 from setuptools.errors import CompileError
 
-from alchemy.tools.sandboxes import LocalSandbox
+from alchemy.tools.sandboxes import LocalSandbox, SubprocessSandbox
 import math
 
 
@@ -30,3 +30,16 @@ class LocalSandboxTest(unittest.TestCase):
         sandbox = LocalSandbox()
         with self.assertRaises(RuntimeError):
             sandbox.run("1/0")
+
+class SubprocessSandboxTest(unittest.TestCase):
+    def test_print(self):
+        sandbox = SubprocessSandbox()
+        self.assertEqual(sandbox.run("print(1+1)").strip(), "2")
+
+    def test_import(self):
+        sandbox = SubprocessSandbox({"subprocess"})
+        code_str = 'import subprocess\nprint(subprocess.run(["ls", "/"]))'
+        print(sandbox.run(code_str).strip())
+        sandbox = SubprocessSandbox()
+        with self.assertRaises(ImportError):
+            sandbox.run(code_str).strip()
