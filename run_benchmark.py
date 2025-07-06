@@ -6,7 +6,8 @@ import os.path
 
 from alchemy.causal_model_wrapper import CausalModelWrapper
 from alchemy.code_model_wrapper import CodeModelWrapper
-from alchemy.tools.sandboxes import LocalSandbox
+from alchemy.tools.sandboxes import LocalSandbox, SubprocessSandbox
+from alchemy.tools.code_log_parser import LogModelWrapper
 
 
 GSM8_causal_prompts = {
@@ -90,7 +91,7 @@ class GSM8KBench:
                 else:
                     num = self.extract_value(model_answer)
             except Exception as e:
-                num = type(e).__name__
+                num = repr(e)
             print(std_num, num, flush=True)
 
             # 假设每个问题只有一个正确答案
@@ -111,5 +112,6 @@ if __name__ == "__main__":
         print(f"Model {model_name} not supported.", file=sys.stderr)
         sys.exit(1)
     model_path = os.path.join(args.model_path, local_models[model_name])
-    rate = bench.evaluate(CodeModelWrapper.from_pretrained(model_path, GSM8_code_prompts.get(model_name), LocalSandbox()))
+    rate = bench.evaluate(CodeModelWrapper.from_pretrained(model_path, GSM8_code_prompts.get(model_name), SubprocessSandbox()))
+    # rate = bench.evaluate(LogModelWrapper(args.model_path, LocalSandbox()))
     print(f"model={model_name}, accuracy: {rate:.2%}")
