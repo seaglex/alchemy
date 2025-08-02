@@ -1,3 +1,11 @@
+numpy
+scipy
+sympy
+pandas
+restrictedpython
+pytorch
 transformers
-accelerate
 datasets
+peft
+trl
+tensorboardx-2.6.4
