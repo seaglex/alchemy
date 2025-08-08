@@ -1,13 +1,15 @@
 import re
 import datasets
 import argparse
-import sys
-import os.path
+import os
 
 from alchemy.causal_model_wrapper import CausalModelWrapper
 from alchemy.code_model_wrapper import CodeModelWrapper
 from alchemy.tools.sandboxes import LocalSandbox, SubprocessSandbox
 from alchemy.tools.code_log_parser import LogModelWrapper
+
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 GSM8_causal_prompts = {
@@ -46,11 +48,9 @@ print(total - left)
 - 输出的python代码按markdown格式，以```python开始，以```结束
 - 代码计算出最终结果需要显式调用print打印
 - 代码**不能没有print函数**""",
-}
-
-
-local_models = {
-    "qwen2.5": "Qwen2.5-1.5B-Instruct"
+    "qwen2.5_lora": """You are given a problem.
+Think about the problem and write python code to solve the problem, and make sure the python code call print() and only print the final answer.
+Output in markdown and surround the code between ```python and ```.""",
 }
 
 
@@ -104,14 +104,18 @@ class GSM8KBench:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--model_path", type=str, required=True)
+    parser.add_argument("-l", "--lora_path", type=str, required=False)
     parser.add_argument("-m", "--model_name", type=str, required=True)
     args = parser.parse_args()
     bench = GSM8KBench()
     model_name = args.model_name
-    if model_name not in local_models:
-        print(f"Model {model_name} not supported.", file=sys.stderr)
-        sys.exit(1)
-    model_path = os.path.join(args.model_path, local_models[model_name])
-    rate = bench.evaluate(CodeModelWrapper.from_pretrained(model_path, GSM8_code_prompts.get(model_name), SubprocessSandbox()))
-    # rate = bench.evaluate(LogModelWrapper(args.model_path, LocalSandbox()))
+    if args.lora_path:
+        rate = bench.evaluate(CodeModelWrapper.from_pretrained_lora(
+            args.model_path, args.lora_path, GSM8_code_prompts.get(model_name), SubprocessSandbox())
+        )
+    else:
+        rate = bench.evaluate(CodeModelWrapper.from_pretrained(
+            args.model_path, GSM8_code_prompts.get(model_name), SubprocessSandbox())
+        )
+        # rate = bench.evaluate(LogModelWrapper(args.model_path, LocalSandbox()))
     print(f"model={model_name}, accuracy: {rate:.2%}")

@@ -1,11 +1,15 @@
 import functools
 import re
 import subprocess
+import warnings
 from RestrictedPython import compile_restricted
 from RestrictedPython import Guards, Eval
 from RestrictedPython.PrintCollector import PrintCollector
 from setuptools.errors import CompileError
 from concurrent.futures import ThreadPoolExecutor
+
+
+warnings.filterwarnings("ignore", module="RestrictedPython")
 
 
 def timeout(seconds: float):
@@ -28,6 +32,9 @@ def timeout(seconds: float):
 
 
 class LocalSandbox(object):
+    """
+    容易出现无限循环，直接卡死所有进程，最多调试用，不要实际用
+    """
     def __init__(self, allowed_modules=None):
         # 设置允许导入的模块白名单
         self.allowed_modules = {'math', 'sympy', 'scipy', 'numpy', 'pandas'} if allowed_modules is None else allowed_modules
@@ -141,6 +148,13 @@ class SubprocessSandbox:
         if match:
             raise ImportError("_import_ is not allowed.")
 
+    def _try_compile(self, code_str):
+        # 编译代码
+        try:
+            _ = compile_restricted(code_str, filename='<inline>', mode='exec')
+        except Exception as e:
+            raise CompileError(f"Failed to compile code: {e}")
+
     def _inner_run(self, code_str: str, timeout_seconds) -> str:
         """
         在子进程中执行代码，并返回 stdout 的内容。
@@ -162,4 +176,5 @@ class SubprocessSandbox:
 
     def run(self, code_str: str, timeout_seconds=5) -> str:
         self._analyze_imports(code_str)
+        self._try_compile(code_str)  ## keep similar behavior as LocalSandbox, for RFT
         return self._inner_run(code_str, timeout_seconds)

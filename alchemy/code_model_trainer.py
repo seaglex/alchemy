@@ -51,8 +51,7 @@ class RewardFunction(object):
         self._sandbox = sandbox
         self._code_regex = re.compile(r"```(?:python|py)?([\s\S]+?)```", re.MULTILINE)
         self._num_regex = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", re.MULTILINE)
-    def __name__(self):
-        return "RewardFunction"
+        self.__name__ = "RewardFunction"
     def __call__(self, completions, final_answer, **kwargs) -> List[float]:
         scores = []
         for completion, std_answer in zip(completions, final_answer):
@@ -81,6 +80,8 @@ class RewardFunction(object):
         except CompileError:
             return -2, None
         except RuntimeError:
+            return -1, None
+        except Exception:
             return -1, None
         return 0, output
 

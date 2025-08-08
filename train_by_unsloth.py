@@ -1,11 +1,10 @@
 from unsloth import FastLanguageModel
-import torch
 from vllm import SamplingParams
 from trl import GRPOConfig, GRPOTrainer
 
 
 from alchemy.code_model_trainer import GRPODataPreparer, RewardFunction
-from alchemy.tools.sandboxes import LocalSandbox
+from alchemy.tools.sandboxes import LocalSandbox, SubprocessSandbox
 
 
 def train_by_unsloth():
@@ -22,7 +21,7 @@ def train_by_unsloth():
         load_in_4bit=False,  # False for LoRA 16bit
         fast_inference=True,  # Enable vLLM fast inference
         max_lora_rank=lora_rank,
-        gpu_memory_utilization=0.7,  # Reduce if out of memory
+        gpu_memory_utilization=0.5,  # Reduce if out of memory
     )
 
     vllm_sampling_params = SamplingParams(
@@ -79,7 +78,7 @@ def train_by_unsloth():
 
     dataset, eval_dataset = GRPODataPreparer().prepare_gsm8k_dataset(tokenizer)
 
-    reward_fn = RewardFunction(LocalSandbox())
+    reward_fn = RewardFunction(SubprocessSandbox())
 
     trainer = GRPOTrainer(
         model=model,
@@ -99,5 +98,5 @@ def train_by_unsloth():
 
 try:
     train_by_unsloth()
-finally:
-    torch.destroy_process_group()
+except Exception as e:
+    print(e)

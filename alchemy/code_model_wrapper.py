@@ -1,5 +1,6 @@
 import re
 
+from peft import PeftModel
 from sympy import resultant
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedModel, PreTrainedTokenizerBase
 from typing import Optional, Tuple
@@ -14,14 +15,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 class CodeModelWrapper(object):
-    def __init__(self, model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, sys_prompt: str, sandbox: LocalSandbox):
+    def __init__(self, model, tokenizer, sys_prompt: str, sandbox: LocalSandbox):
         self.model = model
         self.tokenizer = tokenizer
         self.sys_prompt: str = sys_prompt
         self.sandbox = sandbox  # 接收一个 LocalSandbox 实例
 
     @classmethod
-    def from_pretrained(cls, model_path: str, sys_prompt: str = None, sandbox=None):
+    def from_pretrained(cls, model_path: str, sys_prompt: str = None, sandbox = None):
         if sys_prompt is None:
             sys_prompt = "请根据用户的问题生成对应的 Python 代码，用 markdown 格式包裹。"
         model = AutoModelForCausalLM.from_pretrained(
@@ -30,6 +31,17 @@ class CodeModelWrapper(object):
             device_map="auto"
         )
         tokenizer = AutoTokenizer.from_pretrained(model_path)
+        return cls(model, tokenizer, sys_prompt, sandbox)
+
+    @classmethod
+    def from_pretrained_lora(cls, base_path, lora_path, sys_prompt, sandbox = None):
+        base_model = AutoModelForCausalLM.from_pretrained(
+            base_path,
+            torch_dtype="auto",
+            device_map="auto"
+        )
+        tokenizer = AutoTokenizer.from_pretrained(base_path)
+        model = PeftModel.from_pretrained(base_model, lora_path)
         return cls(model, tokenizer, sys_prompt, sandbox)
 
     def _generate_code(self, question: str) -> (str, Optional[str]):
